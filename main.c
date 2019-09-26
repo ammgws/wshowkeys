@@ -375,26 +375,21 @@ static const struct wl_output_listener wl_output_listener = {
 static void registry_global(void *data, struct wl_registry *wl_registry,
 		uint32_t name, const char *interface, uint32_t version) {
 	struct wsk_state *state = data;
-	struct {
-		const struct wl_interface *interface;
-		int version;
-		void **ptr;
-	} handles[] = {
-		{ &wl_compositor_interface, 4, (void **)&state->compositor },
-		{ &wl_shm_interface, 1, (void **)&state->shm },
-		{ &wl_seat_interface, 5, (void **)&state->seat },
-		{ &zxdg_output_manager_v1_interface, 1, (void **)&state->output_mgr },
-		{ &zwlr_layer_shell_v1_interface, 1, (void **)&state->layer_shell },
-	};
-
-	for (size_t i = 0; i < sizeof(handles) / sizeof(handles[0]); ++i) {
-		if (strcmp(interface, handles[i].interface->name) == 0) {
-			*handles[i].ptr = wl_registry_bind(wl_registry,
-					name, handles[i].interface, handles[i].version);
-		}
-	}
-
-	if (strcmp(interface, wl_output_interface.name) == 0) {
+	if (strcmp(interface, wl_compositor_interface.name) == 0) {
+		state->compositor = wl_registry_bind(wl_registry,
+				name, &wl_compositor_interface, 4);
+	} else if (strcmp(interface, wl_shm_interface.name) == 0) {
+		state->shm = wl_registry_bind(wl_registry, name, &wl_shm_interface, 1);
+	} else if (strcmp(interface, wl_seat_interface.name) == 0) {
+		state->seat = wl_registry_bind(wl_registry,
+				name, &wl_seat_interface, 5);
+	} else if (strcmp(interface, zxdg_output_manager_v1_interface.name) == 0) {
+		state->output_mgr = wl_registry_bind(wl_registry,
+				name, &zxdg_output_manager_v1_interface, 1);
+	} else if (strcmp(interface, zwlr_layer_shell_v1_interface.name) == 0) {
+		state->layer_shell = wl_registry_bind(wl_registry,
+				name, &zwlr_layer_shell_v1_interface, 1);
+	} else if (strcmp(interface, wl_output_interface.name) == 0) {
 		struct wsk_output *output = calloc(1, sizeof(struct wsk_output));
 		output->output = wl_registry_bind(wl_registry,
 				name, &wl_output_interface, 3);
