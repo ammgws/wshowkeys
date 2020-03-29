@@ -4,6 +4,9 @@
  *
  * NOTICE: Most of this code runs as root.
  */
+#ifdef __FreeBSD__
+#define __BSD_VISIBLE 1
+#endif
 #include <errno.h>
 #include <fcntl.h>
 #include <libinput.h>
