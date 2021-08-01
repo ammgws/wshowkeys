@@ -5,6 +5,8 @@ Displays keypresses on screen on supported Wayland compositors (requires
 
 ![](https://sr.ht/xGs2.png)
 
+Forked from https://git.sr.ht/~sircmpwn/wshowkeys as Drew has moved onto other thigns.
+
 ## Installation
 
 Dependencies:
