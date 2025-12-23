@@ -118,8 +118,8 @@ static void render_to_cairo(cairo_t *cairo, struct wsk_state *state,
 
 		int w, h;
 		if (special) {
-			get_text_size(cairo, state->font, &w, &h, NULL, scale, "%s+", name);
-			pango_printf(cairo, state->font, scale,  "%s+", name);
+			get_text_size(cairo, state->font, &w, &h, NULL, scale, "<%s>", name);
+			pango_printf(cairo, state->font, scale,  "<%s>", name);
 		} else {
 			get_text_size(cairo, state->font, &w, &h, NULL, scale, "%s", name);
 			pango_printf(cairo, state->font, scale,  "%s", name);
@@ -153,7 +153,7 @@ static void render_frame(struct wsk_state *state) {
 	cairo_restore(cairo);
 
 	int scale = state->output ? state->output->scale : 1;
-	uint32_t width = 0, height = 0;
+	uint32_t width = 1, height = 1;
 	render_to_cairo(cairo, state, scale, &width, &height);
 	if (height / scale != state->height
 			|| width / scale != state->width
