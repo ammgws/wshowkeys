@@ -56,7 +56,6 @@ struct wsk_state {
 	struct wl_surface *surface;
 	struct zwlr_layer_surface_v1 *layer_surface;
 	uint32_t width, height;
-	bool frame_scheduled, dirty;
 	struct pool_buffer buffers[2];
 	struct pool_buffer *current_buffer;
 	struct wsk_output *output, *outputs;
@@ -93,7 +92,6 @@ static cairo_subpixel_order_t to_cairo_subpixel_order(
 	default:
 		return CAIRO_SUBPIXEL_ORDER_DEFAULT;
 	}
-	return CAIRO_SUBPIXEL_ORDER_DEFAULT;
 }
 
 static void render_to_cairo(cairo_t *cairo, struct wsk_state *state,
@@ -155,21 +153,23 @@ static void render_frame(struct wsk_state *state) {
 	int scale = state->output ? state->output->scale : 1;
 	uint32_t width = 0, height = 0;
 	render_to_cairo(cairo, state, scale, &width, &height);
-	if (height / scale != state->height
-			|| width / scale != state->width
-			|| state->width == 0) {
-		// Reconfigure surface
-		if (width == 0 || height == 0) {
-			wl_surface_attach(state->surface, NULL, 0, 0);
-		} else {
-			zwlr_layer_surface_v1_set_size(
-					state->layer_surface, width / scale, height / scale);
-		}
-
-		// TODO: this could infinite loop if the compositor assigns us a
-		// different height than what we asked for
+	if (width == 0 && height == 0) {                      /* After timeout, state->keys is set to NULL, so
+	                                                       * render_to_cairo width and height dimensions are 0. */
+		// Hide surface by detaching its buffer
+		wl_surface_attach(state->surface, NULL, 0, 0);
+		state->width = 0;
+		state->height = 0;
 		wl_surface_commit(state->surface);
-	} else if (height > 0) {
+	}
+	else if (width / scale != state->width || height / scale != state->height) {
+		// Change layer_surface (currently only increase so that more keys can be shown)
+		zwlr_layer_surface_v1_set_size(
+				state->layer_surface, width / scale, height / scale);
+        // TODO: this could infinite loop if the compositor assigns us a
+        // different height than what we asked for
+		wl_surface_commit(state->surface);
+	} else {
+		assert(width > 0 && height > 0);
 		// Replay recording into shm and send it off
 		state->current_buffer = get_next_buffer(state->shm,
 				state->buffers, state->width * scale, state->height * scale);
@@ -192,16 +192,9 @@ static void render_frame(struct wsk_state *state) {
 		wl_surface_attach(state->surface,
 				state->current_buffer->buffer, 0, 0);
 		wl_surface_damage_buffer(state->surface, 0, 0,
-				state->width, state->height);
+				(int32_t )state->width, (int32_t)state->height);
 		wl_surface_commit(state->surface);
-	}
-}
 
-static void set_dirty(struct wsk_state *state) {
-	if (state->frame_scheduled) {
-		state->dirty = true;
-	} else if (state->surface) {
-		render_frame(state);
 	}
 }
 
@@ -212,7 +205,7 @@ static void layer_surface_configure(void *data,
 	state->width = width;
 	state->height = height;
 	zwlr_layer_surface_v1_ack_configure(zwlr_layer_surface_v1, serial);
-	set_dirty(state);
+	render_frame(state);
 }
 
 static void layer_surface_closed(void *data,
@@ -462,7 +455,7 @@ static void handle_libinput_event(struct wsk_state *state,
 	}
 
 	clock_gettime(CLOCK_MONOTONIC, &state->last_key);
-	set_dirty(state);
+	render_frame(state);
 }
 
 static int libinput_open_restricted(const char *path,
@@ -485,7 +478,7 @@ static uint32_t parse_color(const char *color) {
 		++color;
 	}
 
-	int len = strlen(color);
+	unsigned long len = strlen(color);
 	if (len != 6 && len != 8) {
 		fprintf(stderr, "Invalid color %s, defaulting to color "
 				"0xFFFFFFFF\n", color);
@@ -627,7 +620,6 @@ int main(int argc, char *argv[]) {
 	assert(state.layer_surface);
 	zwlr_layer_surface_v1_add_listener(
 			state.layer_surface, &layer_surface_listener, &state);
-	zwlr_layer_surface_v1_set_size(state.layer_surface, 1, 1);
 	zwlr_layer_surface_v1_set_anchor(state.layer_surface, anchor);
 	zwlr_layer_surface_v1_set_margin(state.layer_surface,
 			margin, margin, margin, margin);
@@ -671,7 +663,7 @@ int main(int argc, char *argv[]) {
 				key = next;
 			}
 			state.keys = NULL;
-			set_dirty(&state);
+			render_frame(&state);
 		}
 
 		if ((pollfds[0].revents & POLLIN)) {
