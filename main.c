@@ -118,8 +118,8 @@ static void render_to_cairo(cairo_t *cairo, struct wsk_state *state,
 
 		int w, h;
 		if (special) {
-			get_text_size(cairo, state->font, &w, &h, NULL, scale, "%s+", name);
-			pango_printf(cairo, state->font, scale,  "%s+", name);
+			get_text_size(cairo, state->font, &w, &h, NULL, scale, "<%s>", name);
+			pango_printf(cairo, state->font, scale,  "<%s>", name);
 		} else {
 			get_text_size(cairo, state->font, &w, &h, NULL, scale, "%s", name);
 			pango_printf(cairo, state->font, scale,  "%s", name);
